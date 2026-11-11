@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>法令の本棚 — やさしい法令リーダー（試作）</title>
+<style>
+body{font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;max-width:760px;margin:0 auto;padding:24px 16px 64px;color:#222;line-height:1.8;background:#fdfcf8}
+h1{font-size:26px;margin:0 0 4px} .sub{color:#666;font-size:14px;margin-bottom:20px}
+input[type=search]{width:100%;font-size:18px;padding:12px;border:2px solid #2a7f62;border-radius:10px;box-sizing:border-box}
+.hint{font-size:13px;color:#666;margin:6px 0 20px}
+.shelf{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}
+.book{border:1px solid #ccc;border-radius:10px;padding:12px 14px;background:#fff;flex:1;min-width:200px;cursor:pointer}
+.book.active{border-color:#2a7f62;box-shadow:0 0 0 2px #2a7f6244}
+.book h3{margin:0;font-size:17px}.book p{margin:4px 0 0;font-size:13px;color:#555}
+.card{background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px 18px;margin:14px 0}
+.card h3{margin:0 0 4px;font-size:18px}.plain{color:#2a7f62;font-size:14px;margin:0 0 8px}
+.card p{margin:0;font-size:15px;white-space:pre-wrap}
+.tl{border-left:3px solid #2a7f62;padding-left:16px;margin:8px 0 8px 4px}
+.tl div{margin:10px 0}.tl b{display:block}
+.note{font-size:13px;color:#666;background:#f2f0e8;border-radius:8px;padding:12px;margin-top:24px}
+footer{font-size:13px;color:#555;border-top:1px solid #ddd;margin-top:32px;padding-top:12px}
+a{color:#2a7f62}
+.cmpTabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.cmpTabs button{font-size:15px;padding:8px 14px;border-radius:999px;border:1px solid #2a7f62;background:#fff;cursor:pointer;font-family:inherit}
+.cmpTabs button.active{background:#2a7f62;color:#fff}
+.cmpHeads{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-weight:bold;margin:8px 0}
+.cmpHeads div{background:#f2f0e8;border-radius:8px;padding:8px 10px;font-size:14px}
+.cmpRow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
+.cmpCell{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 12px;font-size:14px;white-space:pre-wrap;word-break:break-all}
+.cmpRow.same .cmpCell{color:#777;background:#faf9f5}
+.cmpCell.none{color:#999;font-size:13px}
+.cmpCell.delBox{background:#fdf0f0}
+.cmpCell.insBox{background:#effaf2}
+.chg-del{background:#f6c9c9;text-decoration:line-through;border-radius:3px}
+.chg-ins{background:#bfe8c8;border-radius:3px}
+.badge{display:inline-block;background:#2a7f62;color:#fff;border-radius:999px;padding:2px 12px;font-size:13px;margin:4px 0 8px}
+.cmpCtrl{font-size:14px;margin:10px 0}
+.legend{background:#f2f0e8;border-radius:8px;padding:12px 14px;font-size:13px;margin:10px 0}
+.legend .sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin:0 4px 0 10px}
+.chip{display:inline-block;border:1px solid #2a7f62;color:#2a7f62;border-radius:999px;padding:1px 10px;font-size:13px;margin:2px 4px 2px 0}
+.ronten{background:#fff;border-left:3px solid #c9a227;padding:10px 14px;font-size:14px;margin:14px 0}
+.steps{font-size:14px;margin:10px 0}
+.steps div{margin:6px 0}
+.steps b{color:#2a7f62}
+.btnlink{display:inline-block;background:#2a7f62;color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-size:15px}
+@media (max-width:640px){.cmpRow,.cmpHeads{grid-template-columns:1fr}}
+</style></head><body>
+<h1>📚 法令の本棚</h1>
+<p class="sub">むずかしい言葉を使わずに、法律を1条ずつ読める試作リーダー</p>
+<input type="search" id="q" placeholder="法令名・よみがな・キーワードで探す（例：個人情報、こじん、目的）" aria-label="検索">
+<p class="hint">「改正」は「法律が変わったこと」、「本棚」は法令の一覧、という意味で使っています。gitの言葉は画面に出しません。</p>
+
+<div class="shelf" id="shelf"></div>
+<h2 id="lawTitle"></h2>
+<p id="lawMeta" style="color:#555;font-size:14px"></p>
+<div id="cards"></div>
+
+<h2>改正の年表</h2>
+<p style="font-size:14px;color:#555">この法律がいつ、どの法律で変わったか。新しい順に7件だけ表示しています。</p>
+<div class="tl" id="timeline"></div>
+
+<h2>昔と今を比べる</h2>
+<p style="font-size:14px;color:#555">個人情報保護法は2022年4月に大きな改正がありました。その直前（2022年3月まで）の版と、今の版（2026年11月2日から）を並べて比べます。消えた部分は赤、増えた部分は緑で色を付けました。灰色の段落は、むかしも今も同じ文です。</p>
+<div class="legend"><b>色の意味</b><span class="sw" style="background:#f6c9c9"></span>赤＝消えた文（むかしにあって、今はない）<span class="sw" style="background:#bfe8c8"></span>緑＝増えた文（今の版で入った）<span class="sw" style="background:#e8e6df"></span>灰色＝変わっていない文<br>色は「変化の大きさ」ではなく、「消えた／増えた」の区別です。何回もの改正を重ねた文でも、色はこの3種類のままです。その条が何回変わったかは、下の「この条が変わった改正」で分かります。</div>
+<div class="cmpTabs" id="cmpTabs"></div>
+<p class="plain" id="cmpSummary" style="color:#2a7f62;font-size:14px"></p>
+<span class="badge" id="cmpBadge"></span>
+<div id="cmpTags" style="margin:6px 0"></div>
+<div class="cmpCtrl"><label><input type="checkbox" id="cmpOnly"> 変わった所だけ見る</label></div>
+<div class="cmpHeads"><div>むかし（2022年3月までの版）</div><div>いま（2026年11月2日からの版）</div></div>
+<div id="cmpBody"></div>
+<p id="cmpEmpty" style="display:none;color:#666;font-size:14px">この条は変わっていないので、表示する段落がありません。</p>
+<div class="ronten" id="cmpRonten"></div>
+<h3 style="margin-bottom:4px">この条が変わった改正</h3>
+<p style="font-size:13px;color:#555;margin:0">記録のある範囲（2017年以降）で、この条の文章が変わった改正だけを数えました。この法律全体では、この間に30回の改正がありました。</p>
+<div class="steps" id="cmpSteps"></div>
+
+<h2>意見・感想を書く</h2>
+<p style="font-size:14px;color:#555">この試作への意見や、条文の読み解き・改正についての感想は、意見広場で受け付けています。書くにはGitHubのアカウントが必要です。なお、個別の法的相談にはお答えできません（このサイトは法的助言ではありません）。</p>
+<p><a class="btnlink" href="https://github.com/seiji-works/houritsu-gui/discussions">💬 意見広場へ（GitHub Discussions）</a></p>
+
+<div class="note">💡 この試作の読み方：条文のカードには、まず「やさしい一言」（私たちの要約）を置き、その下に条文そのままの文章を載せています。要約は法律そのものではありません。正式な内容は条文で確認してください。なお、このデータの改正の記録は2015年頃からのものが中心です。</div>
+
+<footer>
+<strong>出典・クレジット</strong><br>
+出典：e-Gov法令検索（法令API）／データ：Kohei-Wada『houritsu』（CC BY 4.0）を加工して使用<br>
+条文の文字は変更していません（見出し記号などの表示上の加工を除く）。条文の正本は官報です。法的助言ではありません。<br>
+ライセンス：<a href="https://creativecommons.org/licenses/by/4.0/deed.ja">CC BY 4.0</a> ／ 出典規約：<a href="https://www.digital.go.jp/resources/open_data/public_data_license_v1.0">公共データ利用規約（第1.0版）</a><br>
+元データ：<a href="https://github.com/Kohei-Wada/houritsu">github.com/Kohei-Wada/houritsu</a>
+</footer>
+<script>
+const DATA = {
+ "articles": [
+  {
+   "no": "第一条",
+   "title": "目的",
+   "text": "この法律は、デジタル社会の進展に伴い個人情報の利用が著しく拡大していることに鑑み、個人情報の適正な取扱いに関し、基本理念及び政府による基本方針の作成その他の個人情報の保護に関する施策の基本となる事項を定め、国及び地方公共団体の責務等を明らかにし、個人情報を取り扱う事業者及び行政機関等についてこれらの特性に応じて遵守すべき義務等を定めるとともに、個人情報保護委員会を設置することにより、行政機関等の事務及び事業の適正かつ円滑な運営を図り、並びに個人情報の適正かつ効果的な活用が新たな産業の創出並びに活力ある経済社会及び豊かな国民生活の実現に資するものであることその他の個人情報の有用性に配慮しつつ、個人の権利利益を保護することを目的とする。",
+   "plain": "この法律が何のためにあるか、を宣言する条文。"
+  },
+  {
+   "no": "第二条",
+   "title": "定義",
+   "text": "この法律において「個人情報」とは、生存する個人に関する情報であって、次の各号のいずれかに該当するものをいう。\n- 一 当該情報に含まれる氏名、生年月日その他の記述等（文書、図画若しくは電磁的記録（電磁的方式（電子的方式、磁気的方式その他人の知覚によっては認識することができない方式をいう。次項第二号において同じ。）で作られる記録をいう。以下同じ。）に記載され、若しくは記録され、又は音声、動作その他の方法を用いて表された一切の事項（個人識別符号を除く。）をいう。以下同じ。）により特定の個人を識別することができるもの（他の情報と容易に照合することができ、それにより特定の個人を識別することができることとなるものを含む。）\n- 二 個人識別符号が含まれるもの\n２ この法律において「個人識別符号」とは、次の各号のいずれかに該当する文字、番号、記号その他の符号のうち、政令で定めるものをいう。\n- 一 特定の個人の身体の一部の特徴を電子計算機の用に供するために変換した文字、番号、記号その他の符号であって、当該特定の個人を識別することができるもの\n- 二 個人に提供される役務の利用若しくは個人に販売される商品の購入に関し割り当てられ、又は個人に発行されるカードその他の書類に記載され、若しくは電磁的方式により記録された文字、番号、記号その他の符号であって、その利用者若しくは購入者又は発行を受ける者ごとに異なるものとなるように割り当てられ、又は記載され、若しくは記録されることにより、特定の利用者若しくは購入者又は発行を受ける者を識別することができるもの\n３ この法律において「要配慮個人情報」とは、本人の人種、信条、社会的身分、病歴、犯罪の経歴、犯罪により害を被った事実その他本人に対する不当な差別、偏見その他の不利益が生じないようにその取扱いに特に配慮を要するものとして政令で定める記述等が含まれる個人情報をいう。\n４ この法律において個人情報について「本人」とは、個人情報によって識別される特定の個人をいう。\n５ この法律において「仮名加工情報」とは、次の各号に掲げる個人情報の区分に応じて当該各号に定める措置を講じて他の情報と照合しない限り特定の個人を識別することができないように個人情報を加工して得られる個人に関する情報をいう。\n- 一 第一項第一号に該当する個人情報 当該個人情報に含まれる記述等の一部を削除すること（当該一部の記述等を復元することのできる規則性を有しない方法により他の記述等に置き換えることを含む。）。\n- 二 第一項第二号に該当する個人情報 当該個人情報に含まれる個人識別符号の全部を削除すること（当該個人識別符号を復元することのできる規則性を有しない方法により他の記述等に置き換えることを含む。）。\n６ この法律において「匿名加工情報」とは、次の各号に掲げる個人情報の区分に応じて当該各号に定める措置を講じて特定の個人を識別することができないように個人情報を加工して得られる個人に関する情報であって、当該個人情報を復元することができないようにしたものをいう。\n- 一 第一項第一号に該当する個人情報 当該個人情報に含まれる記述等の一部を削除すること（当該一部の記述等を復元することのできる規則性を有しない方法により他の記述等に置き換えることを含む。）。\n- 二 第一項第二号に該当する個人情報 当該個人情報に含まれる個人識別符号の全部を削除すること（当該個人識別符号を復元することのできる規則性を有しない方法により他の記述等に置き換えることを含む。）。\n７ この法律において「個人関連情報」とは、生存する個人に関する情報であって、個人情報、仮名加工情報及び匿名加工情報のいずれにも該当しないものをいう。\n８ この法律において「行政機関」とは、次に掲げる機関をいう。\n- 一 法律の規定に基づき内閣に置かれる機関（内閣府及び防災庁を除く。）及び内閣の所轄の下に置かれる機関\n- 二 内閣府、宮内庁並びに内閣府設置法（平成十一年法律第八十九号）第四十九条第一項及び第二項に規定する機関（これらの機関のうち第五号の政令で定める機関が置かれる機関にあっては、当該政令で定める機関を除く。）\n- 三 防災庁（第六号の政令で定める施設等機関を除く。）\n- 四 国家行政組織法（昭和二十三年法律第百二十号）第三条第二項に規定する機関（第七号の政令で定める機関が置かれる機関にあっては、当該政令で定める機関を除く。）\n- 五 内閣府設置法第三十九条及び第五十五条並びに宮内庁法（昭和二十二年法律第七十号）第十六条第二項の機関並びに内閣府設置法第四十条及び第五十六条（宮内庁法第十八条第一項において準用する場合を含む。）の特別の機関で、政令で定めるもの\n- 六 防災庁設置法（令和八年法律第六十一号）第十五条の施設等機関で、政令で定めるもの\n- 七 国家行政組織法第八条の二の施設等機関及び同法第八条の三の特別の機関で、政令で定めるもの\n- 八 会計検査院\n９ この法律において「独立行政法人等」とは、独立行政法人通則法（平成十一年法律第百三号）第二条第一項に規定する独立行政法人及び別表第一に掲げる法人をいう。\n１０ この法律において「地方独立行政法人」とは、地方独立行政法人法（平成十五年法律第百十八号）第二条第一項に規定する地方独立行政法人をいう。\n１１ この法律において「行政機関等」とは、次に掲げる機関をいう。\n- 一 行政機関\n- 二 地方公共団体の機関（議会を除く。次章、第三章及び第六十九条第二項第三号を除き、以下同じ。）\n- 三 独立行政法人等（別表第二に掲げる法人を除く。第十六条第二項第三号、第六十三条、第七十八条第一項第七号イ及びロ、第八十九条第四項から第六項まで、第百十九条第五項から第七項まで並びに第百二十五条第二項において同じ。）\n- 四 地方独立行政法人（地方独立行政法人法第二十一条第一号に掲げる業務を主たる目的とするもの又は同条第二号若しくは第三号（チに係る部分に限る。）に掲げる業務を目的とするものを除く。第十六条第二項第四号、第六十三条、第七十八条第一項第七号イ及びロ、第八十九条第七項から第九項まで、第百十九条第八項から第十項まで並びに第百二十五条第二項において同じ。）",
+   "plain": "「個人情報」「個人識別符号」って何を指すか、を決める条文。"
+  },
+  {
+   "no": "第三条",
+   "title": "基本理念",
+   "text": "個人情報は、個人の人格尊重の理念の下に慎重に取り扱われるべきものであることに鑑み、その適正な取扱いが図られなければならない。",
+   "plain": "個人情報を扱うときの基本的な考え方。"
+  },
+  {
+   "no": "第四条",
+   "title": "国の責務",
+   "text": "国は、この法律の趣旨にのっとり、国の機関、地方公共団体の機関、独立行政法人等、地方独立行政法人及び事業者等による個人情報の適正な取扱いを確保するために必要な施策を総合的に策定し、及びこれを実施する責務を有する。",
+   "plain": "国がやるべきことを決めた条文。"
+  },
+  {
+   "no": "第五条",
+   "title": "地方公共団体の責務",
+   "text": "地方公共団体は、この法律の趣旨にのっとり、国の施策との整合性に配慮しつつ、その地方公共団体の区域の特性に応じて、地方公共団体の機関、地方独立行政法人及び当該区域内の事業者等による個人情報の適正な取扱いを確保するために必要な施策を策定し、及びこれを実施する責務を有する。",
+   "plain": "地方公共団体（都道府県・市区町村）がやるべきこと。"
+  },
+  {
+   "no": "第六条",
+   "title": "法制上の措置等",
+   "text": "政府は、個人情報の性質及び利用方法に鑑み、個人の権利利益の一層の保護を図るため特にその適正な取扱いの厳格な実施を確保する必要がある個人情報について、保護のための格別の措置が講じられるよう必要な法制上の措置その他の措置を講ずるとともに、国際機関その他の国際的な枠組みへの協力を通じて、各国政府と共同して国際的に整合のとれた個人情報に係る制度を構築するために必要な措置を講ずるものとする。",
+   "plain": "必要な法律の整備などを国に求める条文。"
+  }
+ ],
+ "timeline": [
+  [
+   "2026-11-02",
+   "防災庁設置法の施行に伴う関係法律の整備等に関する法律"
+  ],
+  [
+   "2026-10-01",
+   "日本学術会議法"
+  ],
+  [
+   "2026-07-17",
+   "防災庁設置法の施行に伴う関係法律の整備等に関する法律"
+  ],
+  [
+   "2026-07-17",
+   "個人情報の保護に関する法律等の一部を改正する法律"
+  ],
+  [
+   "2026-06-24",
+   "民法等の一部を改正する法律の施行に伴う関係法律の整備等に関する法律"
+  ],
+  [
+   "2026-05-21",
+   "民事訴訟法等の一部を改正する法律"
+  ],
+  [
+   "2025-04-01",
+   "デジタル社会形成基本法等の一部を改正する法律"
+  ]
+ ],
+ "compare": [
+  {
+   "no": "第一条",
+   "title": "目的",
+   "summary": "「高度情報通信社会」が「デジタル社会」に言い換えられ、行政機関なども対象に入る書き方になりました。個人情報保護委員会を置くことも、目的の中に明記されています。",
+   "changed": 1,
+   "html": "<div class=\"cmpRow\"><div class=\"cmpCell\">この法律は、<span class=\"chg-del\">高度情報通信</span>社会の進展に伴い個人情報の利用が著しく拡大していることに鑑み、個人情報の適正な取扱いに関し、基本理念及び政府による基本方針の作成その他の個人情報の保護に関する施策の基本となる事項を定め、国及び地方公共団体の責務等を明らかに<span class=\"chg-del\">するとともに</span>、個人情報を取り扱う事業者<span class=\"chg-del\">の</span>遵守すべき義務等を定めることにより、個人情報の適正かつ効果的な活用が新たな産業の創出並びに活力ある経済社会及び豊かな国民生活の実現に資するものであることその他の個人情報の有用性に配慮しつつ、個人の権利利益を保護することを目的とする。</div><div class=\"cmpCell\">この法律は、<span class=\"chg-ins\">デジタル</span>社会の進展に伴い個人情報の利用が著しく拡大していることに鑑み、個人情報の適正な取扱いに関し、基本理念及び政府による基本方針の作成その他の個人情報の保護に関する施策の基本となる事項を定め、国及び地方公共団体の責務等を明らかに<span class=\"chg-ins\">し</span>、個人情報を取り扱う事業者<span class=\"chg-ins\">及び行政機関等についてこれら</span><span class=\"chg-ins\">の</span><span class=\"chg-ins\">特性に応じて</span>遵守すべき義務等を定める<span class=\"chg-ins\">とともに、個人情報保護委員会を設置する</span>ことにより、<span class=\"chg-ins\">行政機関等の事務及び事業の適正かつ円滑な運営を図り、並びに</span>個人情報の適正かつ効果的な活用が新たな産業の創出並びに活力ある経済社会及び豊かな国民生活の実現に資するものであることその他の個人情報の有用性に配慮しつつ、個人の権利利益を保護することを目的とする。</div></div>",
+   "tags": [
+    "趣旨に関わる変更",
+    "字句の言い換え"
+   ],
+   "ronten": "対象が民間の事業者中心から、行政機関など公の側にも広がりました。「デジタル社会」を前提にし、監督役の個人情報保護委員会を置くことも目的に明記されています。『何のための法律か』が少し変わった、と言える所です。",
+   "steps": [
+    {
+     "date": "2022-04-01",
+     "law": "デジタル社会の形成を図るための関係法律の整備に関する法律"
+    }
+   ]
+  },
+  {
+   "no": "第二条",
+   "title": "定義",
+   "summary": "いちばん大きく変わった条です。「仮名加工情報」「個人関連情報」という新しい言葉と、「行政機関」「行政機関等」など役所についての言葉の定義が入りました。反対に「個人データ」「保有個人データ」などの定義は、別の条（第十六条）へ引っ越しました。",
+   "changed": 33,
+   "html": "<div class=\"cmpRow same\"><div class=\"cmpCell\">この法律において「個人情報」とは、生存する個人に関する情報であって、次の各号のいずれかに該当するものをいう。</div><div class=\"cmpCell\">この法律において「個人情報」とは、生存する個人に関する情報であって、次の各号のいずれかに該当するものをいう。</div></div><div class=\"cmpRow\"><div class=\"cmpCell\">- 一 当該情報に含まれる氏名、生年月日その他の記述等（文書、図画若しくは電磁的記録（電磁的方式（電子的方式、磁気的方式その他人の知覚によっては認識することができない方式をいう。次項第二号において同じ。）で作られる記録をいう。<span class=\"chg-del\">第十八条第二項において</span>同じ。）に記載され、若しくは記録され、又は音声、動作その他の方法を用いて表された一切の事項（個人識別符号を除く。）をいう。以下同じ。）により特定の個人を識別することができるもの（他の情報と容易に照合することができ、それにより特定の個人を識別することができることとなるものを含む。）</div><div class=\"cmpCell\">- 一 当該情報に含まれる氏名、生年月日その他の記述等（文書、図画若しくは電磁的記録（電磁的方式（電子的方式、磁気的方式その他人の知覚によっては認識することができない方式をいう。次項第二号において同じ。）で作られる記録をいう。<span class=\"chg-ins\">以下</span>同じ。）に記載され、若しくは記録され、又は音声、動作その他の方法を用いて表された一切の事項（個人識別符号を除く。）をいう。以下同じ。）により特定の個人を識別することができるもの（他の情報と容易に照合することができ、それにより特定の個人を識別することができることとなるものを含む。）</div></div><div class=\"cmpRow same\"><div class=\"cmpCell\">- 二 個人識別符号が含まれるもの</div><div class=\"cmpCell\">- 二 個人識別符号が含まれるもの</div></div><div class=\"cmpRow same\"><div class=\"cmpCell\">２ この法律において「個人識別符号」とは、次の各号のいずれかに該当する文字、番号、記号その他の符号のうち、政令で定めるものをいう。</div><div class=\"cmpCell\">２ この法律において「個人識別符号」とは、次の各号のいずれかに該当する文字、番号、記号その他の符号のうち、政令で定めるものをいう。</div></div><div class=\"cmpRow same\"><div class=\"cmpCell\">- 一 特定の個人の身体の一部の特徴を電子計算機の用に供するために変換した文字、番号、記号その他の符号であって、当該特定の個人を識別することができるもの</div><div class=\"cmpCell\">- 一 特定の個人の身体の一部の特徴を電子計算機の用に供するために変換した文字、番号、記号その他の符号であって、当該特定の個人を識別することができるもの</div></div><div class=\"cmpRow same\"><div class=\"cmpCell\">- 二 個人に提供される役務の利用若しくは個人に販売される商品の購入に関し割り当てられ、又は個人に発行されるカードその他の書類に記載され、若しくは電磁的方式により記録された文字、番号、記号その他の符号であって、その利用者若しくは購入者又は発行を受ける者ごとに異なるものとなるように割り当てられ、又は記載され、若しくは記録されることにより、特定の利用者若しくは購入者又は発行を受ける者を識別することができるもの</div><div class=\"cmpCell\">- 二 個人に提供される役務の利用若しくは個人に販売される商品の購入に関し割り当てられ、又は個人に発行されるカードその他の書類に記載され、若しくは電磁的方式により記録された文字、番号、記号その他の符号であって、その利用者若しくは購入者又は発行を受ける者ごとに異なるものとなるように割り当てられ、又は記載され、若しくは記録されることにより、特定の利用者若しくは購入者又は発行を受ける者を識別することができるもの</div></div><div class=\"cmpRow same\"><div class=\"cmpCell\">３ この法律において「要配慮個人情報」とは、本人の人種、信条、社会的身分、病歴、犯罪の経歴、犯罪により害を被った事実その他本人に対する不当な差別、偏見その他の不利益が生じないようにその取扱いに特に配慮を要するものとして政令で定める記述等が含まれる個人情報をいう。</div><div class=\"cmpCell\">３ この法律において「要配慮個人情報」とは、本人の人種、信条、社会的身分、病歴、犯罪の経歴、犯罪により害を被った事実その他本人に対する不当な差別、偏見その他の不利益が生じないようにその取扱いに特に配慮を要するものとして政令で定める記述等が含まれる個人情報をいう。</div></div><div class=\"cmpRow\"><div class=\"cmpCell\">４ この法律において<span class=\"chg-del\">「</span><span class=\"chg-del\">個人情報</span><span class=\"chg-del\">データベース等</span>」とは、個人情報<span class=\"chg-del\">を含む情報の集合物であ</span><span class=\"chg-del\">って</span><span class=\"chg-del\">、次に掲げ</span><span class=\"chg-del\">る</span><span class=\"chg-del\">も</span><span class=\"chg-del\">の</span><span class=\"chg-del\">（利用方法からみて</span><span class=\"chg-del\">個人</span><span class=\"chg-del\">の権利利益を害するおそれが少ないものとして政令で定めるものを除く。）</span>をいう。</div><div class=\"cmpCell\">４ この法律において<span class=\"chg-ins\">個人情報</span><span class=\"chg-ins\">について「本人</span>」とは、個人情報<span class=\"chg-ins\">によ</span><span class=\"chg-ins\">って</span><span class=\"chg-ins\">識別され</span><span class=\"chg-ins\">る</span><span class=\"chg-ins\">特定</span><span class=\"chg-ins\">の</span><span class=\"chg-ins\">個人</span>をいう。</div></div><div class=\"cmpRow\"><div class=\"cmpCell\"><span class=\"chg-del\">-</span><span class=\"chg-del\"> </span><span class=\"chg-del\">一 </span><span class=\"chg-del\">特定の個人</span><span class=\"chg-del\">情報</span><span class=\"chg-del\">を</span><span class=\"chg-del\">電子計算機を用いて検索</span>することができ<span class=\"chg-del\">る</span><span class=\"chg-del\">ように</span><span class=\"chg-del\">体系的</span><span class=\"chg-del\">に</span><span class=\"chg-del\">構成したもの</span></div><div class=\"cmpCell\"><span class=\"chg-ins\">５</span><span class=\"chg-ins\"> </span><span class=\"chg-ins\">この法律において「仮名加工情報」とは、次の各号に掲げる個人情報の区分に応じて当該各号に定める措置を講じて他の情報と照合しない限り</span><span class=\"chg-ins\">特定の個人</span><span class=\"chg-ins\">を</span><span class=\"chg-ins\">識別</span>することができ<span class=\"chg-ins\">ない</span><span class=\"chg-ins\">ように</span><span class=\"chg-ins\">個人情報を加工して得られる個人</span><span class=\"chg-ins\">に</span><span class=\"chg-ins\">関する情報をいう。</span></div></div><div class=\"cmpRow\"><div class=\"cmpCell delBox\">- 二 前号に掲げるもののほか、特定の個人情報を容易に検索することができるように体系的に構成したものとして政令で定めるもの</div><div class=\"cmpCell none\">（いまの版にはありません）</div></div><div class=\"cmpRow\"><div class=\"cmpCell delBox\">５ この法律において「個人情報取扱事業者」とは、個人情報データベース等を事業の用に供している者をいう。ただし、次に掲げる者を除く。</div><div class=\"cmpCell none\">（いまの版にはありません）</div></div><div class=\"cmpRow\"><div class=\"cmpCell delBox\">- 一 国の機関</div><div class=\"cmpCell none\">（いまの版にはありません）</div></div><div class=\"cmpRow\"><div class=\"cmpCell delBox\">- 二 地方公共団体</div><div class=\"cmpCell none\">（いまの版にはありません）</div></div><div class=\"cmpRow\"><div class=\"cmpCell delBox\">- 三 独立行政法人等（独立行政法人等の保有する個人情報の保護に関する法律（平成十五年法律第五十九号）第二条第一項に規定する独立行政法人等をいう。以下同じ。）</div><div class=\"cmpCell none\">（いまの版にはありません）</div></div><div class=\"cmpRow\"><div class=\"cmpCell delBox\">- 四 地方独立行政法人（地方独立行政法人法（平成十五年法律第百十八号）第二条第一項に規定する地方独立行政法人をいう。以下同じ。）</div><div class=\"cmpCell none\">（いまの版にはありません）</div></div><div class=\"cmpRow\"><div class=\"cmpCell delBox\">６ この法律において「個人データ」とは、個人情報データベース等を構成する個人情報をいう。</div><div class=\"cmpCell none\">（いまの版にはありません）</div></div><div class=\"cmpRow\"><div class=\"cmpCell delBox\">７ この法律において「保有個人データ」とは、個人情報取扱事業者が、開示、内容の訂正、追加又は削除、利用の停止、消去及び第三者への提供の停止を行うことのできる権限を有する個人データであって、その存否が明らかになることにより公益その他の利益が害されるものとして政令で定めるもの又は一年以内の政令で定める期間以内に消去することとなるもの以外のものをいう。</div><div class=\"cmpCell none\">（いまの版にはありません）</div></div><div class=\"cmpRow\"><div class=\"cmpCell delBox\">８ この法律において個人情報について「本人」とは、個人情報によって識別される特定の個人をいう。</div><div class=\"cmpCell none\">（いまの版にはありません）</div></div><div class=\"cmpRow\"><div class=\"cmpCell delBox\">９ この法律において「匿名加工情報」とは、次の各号に掲げる個人情報の区分に応じて当該各号に定める措置を講じて特定の個人を識別することができないように個人情報を加工して得られる個人に関する情報であって、当該個人情報を復元することができないようにしたものをいう。</div><div class=\"cmpCell none\">（いまの版にはありません）</div></div><div class=\"cmpRow same\"><div class=\"cmpCell\">- 一 第一項第一号に該当する個人情報 当該個人情報に含まれる記述等の一部を削除すること（当該一部の記述等を復元することのできる規則性を有しない方法により他の記述等に置き換えることを含む。）。</div><div class=\"cmpCell\">- 一 第一項第一号に該当する個人情報 当該個人情報に含まれる記述等の一部を削除すること（当該一部の記述等を復元することのできる規則性を有しない方法により他の記述等に置き換えることを含む。）。</div></div><div class=\"cmpRow same\"><div class=\"cmpCell\">- 二 第一項第二号に該当する個人情報 当該個人情報に含まれる個人識別符号の全部を削除すること（当該個人識別符号を復元することのできる規則性を有しない方法により他の記述等に置き換えることを含む。）。</div><div class=\"cmpCell\">- 二 第一項第二号に該当する個人情報 当該個人情報に含まれる個人識別符号の全部を削除すること（当該個人識別符号を復元することのできる規則性を有しない方法により他の記述等に置き換えることを含む。）。</div></div><div class=\"cmpRow\"><div class=\"cmpCell\"><span class=\"chg-del\">１０</span> この法律において「匿名加工情報<span class=\"chg-del\">取扱事業者</span><span class=\"chg-del\">」とは、</span><span class=\"chg-del\">匿名加工情報を含む</span><span class=\"chg-del\">情報の</span><span class=\"chg-del\">集合物であっ</span><span class=\"chg-del\">て</span><span class=\"chg-del\">、</span><span class=\"chg-del\">特定の</span><span class=\"chg-del\">匿名加工情報</span><span class=\"chg-del\">を</span><span class=\"chg-del\">電子計算機を用いて検索</span>することができ<span class=\"chg-del\">る</span><span class=\"chg-del\">ように</span><span class=\"chg-del\">体系的に構成したものその他特定の匿名加工</span><span class=\"chg-del\">情報を</span><span class=\"chg-del\">容易</span><span class=\"chg-del\">に</span><span class=\"chg-del\">検索</span>することができ<span class=\"chg-del\">る</span><span class=\"chg-del\">ように</span><span class=\"chg-del\">体系的に構成</span><span class=\"chg-del\">したもの</span><span class=\"chg-del\">として政令で定めるもの（第三十六条第一項において「匿名加工情報データベース等」という。）を事業の用に供している者</span><span class=\"chg-del\">をいう。</span><span class=\"chg-del\">ただし、第五項各号に掲げる者を除く。</span></div><div class=\"cmpCell\"><span class=\"chg-ins\">６</span> この法律において「匿名加工情報<span class=\"chg-ins\">」とは、</span><span class=\"chg-ins\">次の各号に掲げる個人</span><span class=\"chg-ins\">情報の</span><span class=\"chg-ins\">区分に応じ</span><span class=\"chg-ins\">て</span><span class=\"chg-ins\">当該各号に定める措置を講じて</span><span class=\"chg-ins\">特定の</span><span class=\"chg-ins\">個人</span><span class=\"chg-ins\">を</span><span class=\"chg-ins\">識別</span>することができ<span class=\"chg-ins\">ない</span><span class=\"chg-ins\">ように</span><span class=\"chg-ins\">個人</span><span class=\"chg-ins\">情報を</span><span class=\"chg-ins\">加工して得られる個人</span><span class=\"chg-ins\">に</span><span class=\"chg-ins\">関する情報であって、当該個人情報を復元</span>することができ<span class=\"chg-ins\">ない</span><span class=\"chg-ins\">ように</span><span class=\"chg-ins\">したもの</span><span class=\"chg-ins\">をいう。</span></div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 一 第一項第一号に該当する個人情報 当該個人情報に含まれる記述等の一部を削除すること（当該一部の記述等を復元することのできる規則性を有しない方法により他の記述等に置き換えることを含む。）。</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 二 第一項第二号に該当する個人情報 当該個人情報に含まれる個人識別符号の全部を削除すること（当該個人識別符号を復元することのできる規則性を有しない方法により他の記述等に置き換えることを含む。）。</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">７ この法律において「個人関連情報」とは、生存する個人に関する情報であって、個人情報、仮名加工情報及び匿名加工情報のいずれにも該当しないものをいう。</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">８ この法律において「行政機関」とは、次に掲げる機関をいう。</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 一 法律の規定に基づき内閣に置かれる機関（内閣府及び防災庁を除く。）及び内閣の所轄の下に置かれる機関</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 二 内閣府、宮内庁並びに内閣府設置法（平成十一年法律第八十九号）第四十九条第一項及び第二項に規定する機関（これらの機関のうち第五号の政令で定める機関が置かれる機関にあっては、当該政令で定める機関を除く。）</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 三 防災庁（第六号の政令で定める施設等機関を除く。）</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 四 国家行政組織法（昭和二十三年法律第百二十号）第三条第二項に規定する機関（第七号の政令で定める機関が置かれる機関にあっては、当該政令で定める機関を除く。）</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 五 内閣府設置法第三十九条及び第五十五条並びに宮内庁法（昭和二十二年法律第七十号）第十六条第二項の機関並びに内閣府設置法第四十条及び第五十六条（宮内庁法第十八条第一項において準用する場合を含む。）の特別の機関で、政令で定めるもの</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 六 防災庁設置法（令和八年法律第六十一号）第十五条の施設等機関で、政令で定めるもの</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 七 国家行政組織法第八条の二の施設等機関及び同法第八条の三の特別の機関で、政令で定めるもの</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 八 会計検査院</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">９ この法律において「独立行政法人等」とは、独立行政法人通則法（平成十一年法律第百三号）第二条第一項に規定する独立行政法人及び別表第一に掲げる法人をいう。</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">１０ この法律において「地方独立行政法人」とは、地方独立行政法人法（平成十五年法律第百十八号）第二条第一項に規定する地方独立行政法人をいう。</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">１１ この法律において「行政機関等」とは、次に掲げる機関をいう。</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 一 行政機関</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 二 地方公共団体の機関（議会を除く。次章、第三章及び第六十九条第二項第三号を除き、以下同じ。）</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 三 独立行政法人等（別表第二に掲げる法人を除く。第十六条第二項第三号、第六十三条、第七十八条第一項第七号イ及びロ、第八十九条第四項から第六項まで、第百十九条第五項から第七項まで並びに第百二十五条第二項において同じ。）</div></div><div class=\"cmpRow\"><div class=\"cmpCell none\">（むかしの版にはありません）</div><div class=\"cmpCell insBox\">- 四 地方独立行政法人（地方独立行政法人法第二十一条第一号に掲げる業務を主たる目的とするもの又は同条第二号若しくは第三号（チに係る部分に限る。）に掲げる業務を目的とするものを除く。第十六条第二項第四号、第六十三条、第七十八条第一項第七号イ及びロ、第八十九条第七項から第九項まで、第百十九条第八項から第十項まで並びに第百二十五条第二項において同じ。）</div></div>",
+   "tags": [
+    "構造の変更",
+    "新しい概念の追加",
+    "定義のお引越し"
+   ],
+   "ronten": "「仮名加工情報」は、名前などを消して『使えるけれど、誰のものかは分からない』データの扱いを認める考え方です。守ることと活かすことのバランスが論点になります。2022年4月1日には、2つの別の改正法が同じ日にこの条を触っています。同じ条を複数の改正が重なる珍しい例です。",
+   "steps": [
+    {
+     "date": "2017-05-30",
+     "law": "個人情報の保護に関する法律及び行政手続における特定の個人を識別するための番号の利用等に関する法律の一部を改正する法律"
+    },
+    {
+     "date": "2022-04-01",
+     "law": "個人情報の保護に関する法律等の一部を改正する法律"
+    },
+    {
+     "date": "2022-04-01",
+     "law": "デジタル社会の形成を図るための関係法律の整備に関する法律"
+    },
+    {
+     "date": "2023-04-01",
+     "law": "デジタル社会の形成を図るための関係法律の整備に関する法律"
+    },
+    {
+     "date": "2026-11-02",
+     "law": "防災庁設置法の施行に伴う関係法律の整備等に関する法律"
+    }
+   ]
+  },
+  {
+   "no": "第三条",
+   "title": "基本理念",
+   "summary": "変わったのは漢字ひとつだけ。「かんがみ」が「鑑み」になりました。",
+   "changed": 1,
+   "html": "<div class=\"cmpRow\"><div class=\"cmpCell\">個人情報は、個人の人格尊重の理念の下に慎重に取り扱われるべきものであることに<span class=\"chg-del\">かんが</span>み、その適正な取扱いが図られなければならない。</div><div class=\"cmpCell\">個人情報は、個人の人格尊重の理念の下に慎重に取り扱われるべきものであることに<span class=\"chg-ins\">鑑</span>み、その適正な取扱いが図られなければならない。</div></div>",
+   "tags": [
+    "字句のみ"
+   ],
+   "ronten": "意味は変わっていません。漢字の使い方をそろえただけの変更で、こういうものは「形式的な改正」と呼ばれます。",
+   "steps": [
+    {
+     "date": "2022-04-01",
+     "law": "デジタル社会の形成を図るための関係法律の整備に関する法律"
+    }
+   ]
+  },
+  {
+   "no": "第四条",
+   "title": "国の責務",
+   "summary": "国の責務の中身が具体的に書かれるようになりました（国の機関や地方公共団体、独立行政法人などによる個人情報の取扱いを確保すること）。",
+   "changed": 1,
+   "html": "<div class=\"cmpRow\"><div class=\"cmpCell\">国は、この法律の趣旨にのっとり、個人情報の適正な取扱いを確保するために必要な施策を総合的に策定し、及びこれを実施する責務を有する。</div><div class=\"cmpCell\">国は、この法律の趣旨にのっとり、<span class=\"chg-ins\">国の機関、地方公共団体の機関、独立行政法人等、地方独立行政法人及び事業者等による</span>個人情報の適正な取扱いを確保するために必要な施策を総合的に策定し、及びこれを実施する責務を有する。</div></div>",
+   "tags": [
+    "内容の具体化"
+   ],
+   "ronten": "2022年と2023年の2回に分けて変わりました。国の仕事の中身が、段階的に具体的に書き込まれていった例です。",
+   "steps": [
+    {
+     "date": "2022-04-01",
+     "law": "デジタル社会の形成を図るための関係法律の整備に関する法律"
+    },
+    {
+     "date": "2023-04-01",
+     "law": "デジタル社会の形成を図るための関係法律の整備に関する法律"
+    }
+   ]
+  },
+  {
+   "no": "第五条",
+   "title": "地方公共団体の責務",
+   "summary": "「国の施策との整合性に配慮しつつ」という言葉が加わり、地方公共団体の機関や区域内の事業者など、対象が具体的に書かれるようになりました。",
+   "changed": 1,
+   "html": "<div class=\"cmpRow\"><div class=\"cmpCell\">地方公共団体は、この法律の趣旨にのっとり、その地方公共団体の区域の特性に応じて、個人情報の適正な取扱いを確保するために必要な施策を策定し、及びこれを実施する責務を有する。</div><div class=\"cmpCell\">地方公共団体は、この法律の趣旨にのっとり、<span class=\"chg-ins\">国の施策との整合性に配慮しつつ、</span>その地方公共団体の区域の特性に応じて、<span class=\"chg-ins\">地方公共団体の機関、地方独立行政法人及び当該区域内の事業者等による</span>個人情報の適正な取扱いを確保するために必要な施策を策定し、及びこれを実施する責務を有する。</div></div>",
+   "tags": [
+    "内容の具体化"
+   ],
+   "ronten": "変わったのは2023年4月から。地方公共団体についての部分は、ほかの部分より1年遅れて始まったことが分かります。",
+   "steps": [
+    {
+     "date": "2023-04-01",
+     "law": "デジタル社会の形成を図るための関係法律の整備に関する法律"
+    }
+   ]
+  },
+  {
+   "no": "第六条",
+   "title": "法制上の措置等",
+   "summary": "この条は、むかしといまで一字も変わりませんでした。",
+   "changed": 0,
+   "html": "<div class=\"cmpRow same\"><div class=\"cmpCell\">政府は、個人情報の性質及び利用方法に鑑み、個人の権利利益の一層の保護を図るため特にその適正な取扱いの厳格な実施を確保する必要がある個人情報について、保護のための格別の措置が講じられるよう必要な法制上の措置その他の措置を講ずるとともに、国際機関その他の国際的な枠組みへの協力を通じて、各国政府と共同して国際的に整合のとれた個人情報に係る制度を構築するために必要な措置を講ずるものとする。</div><div class=\"cmpCell\">政府は、個人情報の性質及び利用方法に鑑み、個人の権利利益の一層の保護を図るため特にその適正な取扱いの厳格な実施を確保する必要がある個人情報について、保護のための格別の措置が講じられるよう必要な法制上の措置その他の措置を講ずるとともに、国際機関その他の国際的な枠組みへの協力を通じて、各国政府と共同して国際的に整合のとれた個人情報に係る制度を構築するために必要な措置を講ずるものとする。</div></div>",
+   "tags": [
+    "比べた期間では変更なし"
+   ],
+   "ronten": "比べた期間では一字も変わりませんでした。記録のある範囲（2017年以降）では、2017年に1回だけ変わっています。",
+   "steps": [
+    {
+     "date": "2017-05-30",
+     "law": "個人情報の保護に関する法律及び行政手続における特定の個人を識別するための番号の利用等に関する法律の一部を改正する法律"
+    }
+   ]
+  }
+ ]
+};
+const laws=[
+ {title:"個人情報の保護に関する法律",kana:"こじんじょうほうのほごにかんするほうりつ",abbr:"個人情報保護法",num:"平成十五年法律第五十七号",rev:"最新：令和八年法律第六十二号（2026-11-02施行）",ready:true},
+ {title:"民法",kana:"みんぽう",abbr:"",num:"明治二十九年法律第八十九号",rev:"最新：令和八年法律第四十五号（2026-06-24施行）",ready:false},
+ {title:"刑法",kana:"けいほう",abbr:"",num:"明治四十年法律第四十五号",rev:"最新：令和七年法律第三十九号（2025-05-21施行）",ready:false}
+];
+let current=0;
+const shelf=document.getElementById('shelf');
+laws.forEach((l,i)=>{
+ const d=document.createElement('div');d.className='book'+(i===0?' active':'');
+ d.innerHTML='<h3>'+l.title+'</h3><p>'+l.num+'<br>'+l.rev+'</p>'+(l.ready?'':'<p>※ 本文はまだこの試作に入っていません</p>');
+ d.onclick=()=>{current=i;document.querySelectorAll('.book').forEach((b,j)=>b.classList.toggle('active',j===i));render();};
+ shelf.appendChild(d);
+});
+function render(){
+ const l=laws[current];
+ document.getElementById('lawTitle').textContent=l.title;
+ document.getElementById('lawMeta').textContent=l.num+' ／ '+l.rev+' ／ 全206条（この試作は第一章・第1条〜第6条のみ）';
+ const q=(document.getElementById('q').value||'').trim();
+ const box=document.getElementById('cards');box.innerHTML='';
+ if(!l.ready){box.innerHTML='<p>この法令の本文は、試作の次の段階で追加します。上のカードの「最新」情報は、houritsuの実データ（frontmatter）から取ったものです。</p>';return;}
+ DATA.articles.filter(a=>!q||(a.no+a.title+a.plain+a.text).includes(q)).forEach(a=>{
+   const c=document.createElement('div');c.className='card';
+   c.innerHTML='<h3>'+a.no+'（'+a.title+'）</h3><p class="plain">やさしい一言：'+a.plain+'</p><p></p>';
+   c.querySelector('p:last-child').textContent=a.text;
+   box.appendChild(c);
+ });
+ if(!box.children.length)box.innerHTML='<p>見つかりませんでした。別の言葉で探してみてください。</p>';
+}
+document.getElementById('timeline').innerHTML=DATA.timeline.map(t=>'<div><b>'+t[0]+' 施行</b>'+t[1]+'</div>').join('');
+document.getElementById('q').addEventListener('input',render);
+render();
+
+// ---- old vs new comparison ----
+let cmpIdx=0;
+const cmpTabs=document.getElementById('cmpTabs');
+DATA.compare.forEach((c,i)=>{
+ const b=document.createElement('button');
+ b.textContent=c.no;
+ b.className=i===0?'active':'';
+ b.onclick=()=>{cmpIdx=i;renderCmp();};
+ cmpTabs.appendChild(b);
+});
+function renderCmp(){
+ const c=DATA.compare[cmpIdx];
+ document.getElementById('cmpSummary').textContent='やさしい一言：'+c.summary;
+ document.getElementById('cmpBody').innerHTML=c.html;
+ document.querySelectorAll('#cmpTabs button').forEach((b,j)=>b.classList.toggle('active',j===cmpIdx));
+ document.getElementById('cmpBadge').textContent=c.changed?('変わった段落：'+c.changed+'か所'):'この条は変わりませんでした';
+ document.getElementById('cmpTags').innerHTML=(c.tags||[]).map(t=>'<span class="chip">'+t+'</span>').join('');
+ const rt=document.getElementById('cmpRonten');
+ rt.textContent=c.ronten?('読み解きメモ（私たちの解釈です）：'+c.ronten):'';
+ rt.style.display=c.ronten?'':'none';
+ const st=document.getElementById('cmpSteps');st.innerHTML='';
+ if(c.steps&&c.steps.length){
+   const h=document.createElement('div');
+   h.innerHTML='<b>'+c.steps.length+'回</b> 変わりました';
+   st.appendChild(h);
+   c.steps.forEach(s=>{
+     const d=document.createElement('div');
+     const b=document.createElement('b');b.textContent=s.date+' 施行';
+     d.appendChild(b);d.appendChild(document.createTextNode('　'+s.law));
+     st.appendChild(d);
+   });
+ }else{
+   st.innerHTML='<div>記録のある範囲では、この条が変わった改正はありません。</div>';
+ }
+ applyCmpFilter();
+}
+function applyCmpFilter(){
+ const only=document.getElementById('cmpOnly').checked;
+ let visible=0;
+ document.querySelectorAll('#cmpBody .cmpRow').forEach(r=>{
+   const hide=only&&r.classList.contains('same');
+   r.style.display=hide?'none':'';
+   if(!hide)visible++;
+ });
+ document.getElementById('cmpEmpty').style.display=(only&&visible===0)?'':'none';
+}
+document.getElementById('cmpOnly').addEventListener('change',applyCmpFilter);
+renderCmp();
+</script></body></html>
